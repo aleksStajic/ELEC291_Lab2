@@ -224,14 +224,24 @@ Timer2_ISR_done:
 	jnb Alarm_mode, real_done ; if Alarm_mode is off, we skip to Timer2_ISR_done
 	mov a, minutes
 	cjne a, minutes_A, real_done ; if minutes_clock != minutes_A skip to Timer2_ISR_done, else check hours next
-	;mov a, hours
-	;cjne a, #hours_A, Timer2_ISR_done ; if hours_clock != hours_A skips to TImer2_ISR_done, else check if AM/PM matches
-	;mov a, AMPM_flag
-	;cjne a, #AMPM_flag_A_set, Timer2_ISR_done ; if AM/PM on the clock != AM/PM on the alarm, times are not equal so skip to done
+	mov a, hours
+	cjne a, hours_A, real_done ; if hours_clock != hours_A skips to TImer2_ISR_done, else check if AM/PM matches
+	jb AMPM_flag, check1 ; if AMPM_flag = 1, check if AMPM_flag_A_set also is 1 (that means bboth alarm and clock are in AM)
+	jnb AMPM_flag, check2 ; if AMPM_flag = 0, check if AMPM_flag_A_set also is 0 (that means bboth alarm and clock are in PM)
+	; if AM/PM on the clock != AM/PM on the alarm, times are not equal so skip to done
 	; if we made it here, the clock time equals the alarm time, so that means we need to sound the alarm
 	setb Alarm_active ; turn on the alarm active flag
 	setb ET0 ; enable Timer_0 interrupt -> this will cause our alarm to go off
-	
+	sjmp real_done
+	check1:
+		jnb AMPM_flag_A_set, real_done ; if AMPM_flag_A_set = 0, that means clock is in AM, alarm is in PM, so goto real_done
+		setb Alarm_active ; else, trigger alarm
+		setb ET0
+		sjmp real_done
+	check2: 
+		jb AMPM_flag_A_set, real_done ;if AMPM_flag_A_set = 1, that means clock is in PM, alarm is in AM, so goto real_done
+		setb Alarm_active ; else, trigger alarm
+		setb ET0
 	real_done:
 		pop psw
 		pop acc
