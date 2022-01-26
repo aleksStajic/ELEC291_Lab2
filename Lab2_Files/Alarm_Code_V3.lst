@@ -395,9 +395,9 @@
 02D0 C206       326       clr Alarm_active ; make sure alarm is not active
 02D2 753200     327            mov seconds, #0x00 ;initialize seconds to zero
 02D5 753300     328            mov minutes, #0x00 ;initialize minutes to zero
-02D8 753400     329            mov hours, #0x00 ;initialize hours to zero
+02D8 753401     329            mov hours, #0x01 ;initialize hours to 1
 02DB 753500     330            mov minutes_A, #0x00
-02DE 753600     331            mov hours_A, #0x00
+02DE 753601     331            mov hours_A, #0x01
 02E1            332   
 02E1            333   Alarm_OnOff: ; defaults to alarm OFF after passing through the main initialization loop
 02E1 30024C     334            jnb Alarm_Clock_flag, loop ; if we enter here after main, makes sure alarm is kept off and skip to loop

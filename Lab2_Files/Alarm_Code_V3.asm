@@ -326,9 +326,9 @@ main:
     clr Alarm_active ; make sure alarm is not active
 	mov seconds, #0x00 ;initialize seconds to zero
 	mov minutes, #0x00 ;initialize minutes to zero
-	mov hours, #0x00 ;initialize hours to zero
+	mov hours, #0x01 ;initialize hours to 1
 	mov minutes_A, #0x00
-	mov hours_A, #0x00
+	mov hours_A, #0x01
 
 Alarm_OnOff: ; defaults to alarm OFF after passing through the main initialization loop
 	jnb Alarm_Clock_flag, loop ; if we enter here after main, makes sure alarm is kept off and skip to loop
