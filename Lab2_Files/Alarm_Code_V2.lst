@@ -144,17 +144,17 @@
 012E D2AD       142       setb ET2  ; Enable timer 2 interrupt
 0130 D2CA       143       setb TR2  ; Enable timer 2
 0132 22         144            ret
-0133            145   change_AMPM_A:
+0133            145   change_AMPM_A: ; label to update AMPM flag for the alarm row
 0133 C0E0       146            push acc
 0135 740C       146            mov a, #12
 0137 14         146            dec a
 0138 1200BD     146            lcall ?Set_Cursor_2 ; Select column and row
 013B D0E0       146            pop acc
-013D 30040C     147            jnb AMPM_flag_A_set, write_AM_A
+013D 30040C     147            jnb AMPM_flag_A_set, write_AM_A ; if current flag is PM, update to AM
 0140 C0E0       148            push acc
 0142 7450       148            mov a, #'P'
 0144 12007E     148            lcall ?WriteData
-0147 D0E0       148            pop acc
+0147 D0E0       148            pop acc ; else, curruent flag was AM, update to PM
 0149 C204       149            clr AMPM_flag_A_set
 014B 22         150            ret
 014C            151            write_AM_A:
@@ -165,17 +165,17 @@
 0155 D204       153                    setb AMPM_flag_A_set
 0157 22         154                    ret
 0158            155   change_AMPM:
-0158 3003D8     156            jnb AMPM_flag_A, change_AMPM_A
+0158 3003D8     156            jnb AMPM_flag_A, change_AMPM_A ; if we are in "ALARM" mode, we should change the AM/PM type for the second row (jump to AMPM_A label)
 015B C0E0       157            push acc
 015D 7410       157            mov a, #16
 015F 14         157            dec a
 0160 1200BF     157            lcall ?Set_Cursor_1 ; Select column and row
-0163 D0E0       157            pop acc
-0165 30010C     158            jnb AMPM_flag, write_AM
+0163 D0E0       157            pop acc ; otherwise, change the AM/PM type for the first row
+0165 30010C     158            jnb AMPM_flag, write_AM ; if current flag is PM, update to AM
 0168 C0E0       159            push acc
 016A 7450       159            mov a, #'P'
 016C 12007E     159            lcall ?WriteData
-016F D0E0       159            pop acc
+016F D0E0       159            pop acc ; else, current flag was AM, update to PM
 0171 C201       160       clr AMPM_flag
 0173 22         161       ret
 0174            162            write_AM:
@@ -237,7 +237,7 @@
 01BA E534       215            mov a, hours
 01BC B41306     216            cjne a, #0x13, Timer2_ISR_done ; check if hours was at 12:00 when we reached 60 minutes(if not, goto Timer2_ISR_done)
 01BF 753401     217            mov hours, #0x01 ; reset hours back to 1:00 if it was at 12:00 when we reached 60 minutes
-01C2 120158     218            lcall change_AMPM
+01C2 120158     218            lcall change_AMPM ; if hours has gone over 12:00, we need to change the AMPM flag
 01C5            219            
 01C5            220   Timer2_ISR_done:
 01C5 D0D0       221            pop psw
@@ -252,13 +252,13 @@
 01D1 22         230            ret
 01D2            231            
 01D2            232   Update_Minutes:  ; updates either clock or alarm minute value
-01D2 300211     233            jnb Alarm_Clock_flag, Minutes_Clock
-01D5 E535       234            mov a, minutes_A
+01D2 300211     233            jnb Alarm_Clock_flag, Minutes_Clock ; if not in alarm mode, update the clock time values
+01D5 E535       234            mov a, minutes_A ; else, update the alarm values
 01D7 2401       235            add a, #0x01
 01D9 D4         236            da a ;value in a -> BCD
 01DA F535       237            mov minutes_A, a ; seconds = BCD value
 01DC B46006     238            cjne a, #0x60, minute_A_done ; check if our alarm_minutes value has gone over 60 (if not, skip to minute_A_done)
-01DF 753500     239            mov minutes_A, #0x00
+01DF 753500     239            mov minutes_A, #0x00 ; else, reset minute_A, and update the hours
 01E2 1201EE     240            lcall Update_Hours
 01E5            241            minute_A_done:
 01E5 22         242                    ret
@@ -269,14 +269,14 @@
 01EB F533       247                    mov minutes, a  
 01ED 22         248                    ret
 01EE            249   Update_Hours: ; updates either clock or alarm hour value
-01EE 300211     250            jnb Alarm_Clock_flag, Hours_Clock
+01EE 300211     250            jnb Alarm_Clock_flag, Hours_Clock ; if not in alarm mode, update the clock hour values
 01F1 E536       251            mov a, hours_A
 01F3 2401       252            add a, #0x01
 01F5 D4         253            da a ;value in a -> BCD
 01F6 F536       254            mov hours_A, a ; seconds = BCD value
 01F8 B41306     255            cjne a, #0x13, hours_A_done
 01FB 753601     256            mov hours_A, #0x01
-01FE 120158     257            lcall change_AMPM
+01FE 120158     257            lcall change_AMPM ; if we have gone over 12 hours, we need to change AM/PM
 0201            258            
 0201            259            hours_A_done:
 0201 22         260                    ret
@@ -442,11 +442,11 @@
 0343 20A1CF     369            jb CLOCK_MODE, loop_a  ; if the 'BOOT' button is not pressed, goto loop_a 
 0346 30A1FD     370            jnb CLOCK_MODE, $          ; Wait for button release.  The '$' means: jump to same instruction
 0349            371   mode_push:
-0349 B202       372            cpl Alarm_Clock_flag
-034B B203       373            cpl AMPM_flag_A
+0349 B202       372            cpl Alarm_Clock_flag ; triggers if we switch to "alarm" or "clock" editing mode
+034B B203       373            cpl AMPM_flag_A ; flag to allow us to control the AM and PM setting in the ALARM row
 034D B2AD       374            cpl ET2  ; Enable timer 2 interrupt
 034F 80C7       375            sjmp loop_b
-0351            376   write_times:
+0351            376   write_times: ; label to write all relevant time values to the LCD
 0351 C0E0       377            push acc
 0353 740D       377            mov a, #13
 0355 14         377            dec a
