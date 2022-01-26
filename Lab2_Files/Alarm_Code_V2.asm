@@ -142,10 +142,10 @@ Timer2_Init:
     setb ET2  ; Enable timer 2 interrupt
     setb TR2  ; Enable timer 2
 	ret
-change_AMPM_A:
+change_AMPM_A: ; label to update AMPM flag for the alarm row
 	Set_Cursor(2, 12)
-	jnb AMPM_flag_A_set, write_AM_A
-	Display_char(#'P')
+	jnb AMPM_flag_A_set, write_AM_A ; if current flag is PM, update to AM
+	Display_char(#'P') ; else, curruent flag was AM, update to PM
 	clr AMPM_flag_A_set
 	ret
 	write_AM_A:
@@ -153,10 +153,10 @@ change_AMPM_A:
 		setb AMPM_flag_A_set
 		ret
 change_AMPM:
-	jnb AMPM_flag_A, change_AMPM_A ; if we are in "ALARM" mode, we should change the AM/PM type for the second row
+	jnb AMPM_flag_A, change_AMPM_A ; if we are in "ALARM" mode, we should change the AM/PM type for the second row (jump to AMPM_A label)
 	Set_Cursor(1, 16) ; otherwise, change the AM/PM type for the first row
-	jnb AMPM_flag, write_AM
-    Display_char(#'P')
+	jnb AMPM_flag, write_AM ; if current flag is PM, update to AM
+    Display_char(#'P') ; else, current flag was AM, update to PM
     clr AMPM_flag
     ret
 	write_AM:
@@ -215,7 +215,7 @@ Update_Times: ;update all times subroutine (will trigger if we have reached a 60
 	mov a, hours
 	cjne a, #0x13, Timer2_ISR_done ; check if hours was at 12:00 when we reached 60 minutes(if not, goto Timer2_ISR_done)
 	mov hours, #0x01 ; reset hours back to 1:00 if it was at 12:00 when we reached 60 minutes
-	lcall change_AMPM
+	lcall change_AMPM ; if hours has gone over 12:00, we need to change the AMPM flag
 	
 Timer2_ISR_done:
 	pop psw
@@ -230,13 +230,13 @@ Update_Seconds:
 	ret
 	
 Update_Minutes:	; updates either clock or alarm minute value
-	jnb Alarm_Clock_flag, Minutes_Clock
-	mov a, minutes_A
+	jnb Alarm_Clock_flag, Minutes_Clock ; if not in alarm mode, update the clock time values
+	mov a, minutes_A ; else, update the alarm values
 	add a, #0x01
 	da a ;value in a -> BCD
 	mov minutes_A, a ; seconds = BCD value
 	cjne a, #0x60, minute_A_done ; check if our alarm_minutes value has gone over 60 (if not, skip to minute_A_done)
-	mov minutes_A, #0x00
+	mov minutes_A, #0x00 ; else, reset minute_A, and update the hours
 	lcall Update_Hours
 	minute_A_done:
 		ret
@@ -247,7 +247,7 @@ Update_Minutes:	; updates either clock or alarm minute value
 		mov minutes, a	
 		ret
 Update_Hours: ; updates either clock or alarm hour value
-	jnb Alarm_Clock_flag, Hours_Clock
+	jnb Alarm_Clock_flag, Hours_Clock ; if not in alarm mode, update the clock hour values
 	mov a, hours_A
 	add a, #0x01
 	da a ;value in a -> BCD
@@ -373,7 +373,7 @@ mode_push:
 	cpl AMPM_flag_A ; flag to allow us to control the AM and PM setting in the ALARM row
 	cpl ET2  ; Enable timer 2 interrupt
 	sjmp loop_b
-write_times:
+write_times: ; label to write all relevant time values to the LCD
 	Set_Cursor(1, 13)     ; the place in the LCD where we want the BCD counter value
 	Display_BCD(seconds) ; This macro is also in 'LCD_4bit.inc'
 	Set_Cursor(1, 10)
