@@ -74,6 +74,7 @@ Alarm_Clock_flag: dbit 1 ;flag for modifying alarm or clock values (Alarm_Clock_
 AMPM_flag_A: dbit 1
 AMPM_flag_A_set: dbit 1
 Alarm_mode: dbit 1
+Alarm_active: dbit 1
 
 cseg
 ; These 'equ' must match the hardware wiring
@@ -110,7 +111,7 @@ Timer0_Init:
 	mov RH0, #high(TIMER0_RELOAD)
 	mov RL0, #low(TIMER0_RELOAD)
 	; Enable the timer and interrupts
-    setb ET0  ; Enable timer 0 interrupt
+    clr ET0  ; disable timer 0 interrupt (we will do turn this on when the alarm triggers)
     setb TR0  ; Start timer 0
 	ret
 
@@ -219,9 +220,22 @@ Update_Times: ;update all times subroutine (will trigger if we have reached a 60
 	lcall change_AMPM ; if hours has gone over 12:00, we need to change the AMPM flag
 	
 Timer2_ISR_done:
-	pop psw
-	pop acc
-	reti ;return from the interupt
+	; after all our relevant times have updated, we should compare the current time with the alarm time if the alarm is active
+	jnb Alarm_mode, real_done ; if Alarm_mode is off, we skip to Timer2_ISR_done
+	mov a, minutes
+	cjne a, minutes_A, real_done ; if minutes_clock != minutes_A skip to Timer2_ISR_done, else check hours next
+	;mov a, hours
+	;cjne a, #hours_A, Timer2_ISR_done ; if hours_clock != hours_A skips to TImer2_ISR_done, else check if AM/PM matches
+	;mov a, AMPM_flag
+	;cjne a, #AMPM_flag_A_set, Timer2_ISR_done ; if AM/PM on the clock != AM/PM on the alarm, times are not equal so skip to done
+	; if we made it here, the clock time equals the alarm time, so that means we need to sound the alarm
+	setb Alarm_active ; turn on the alarm active flag
+	setb ET0 ; enable Timer_0 interrupt -> this will cause our alarm to go off
+	
+	real_done:
+		pop psw
+		pop acc
+		reti ;return from the interupt
 	
 Update_Seconds:
 	mov a, seconds
@@ -291,12 +305,15 @@ main:
     Display_char(#'A')
     Set_Cursor(2,12)
     Display_char(#'A')
+    Set_Cursor(2, 14)
+    Send_Constant_String(#Alarm_off) ; initially display that the alarm is turned off
     setb one_second_flag
     setb AMPM_flag
     setb AMPM_flag_A
     setb AMPM_flag_A_set
     clr Alarm_Clock_flag ; alarm clock flag initially set to zero
     clr Alarm_mode ; alarm should be automatically set to off
+    clr Alarm_active ; make sure alarm is not active
 	mov seconds, #0x00 ;initialize seconds to zero
 	mov minutes, #0x00 ;initialize minutes to zero
 	mov hours, #0x00 ;initialize hours to zero
@@ -305,16 +322,21 @@ main:
 
 Alarm_OnOff: ; defaults to alarm OFF after passing through the main initialization loop
 	jnb Alarm_Clock_flag, loop ; if we enter here after main, makes sure alarm is kept off and skip to loop
-	jnb Alarm_mode, turn_A_on ; if ALARM_ON is zero (off) we want to turn it on
-		cpl Alarm_mode ; else, we turn off ALARM_ON
+	jnb Alarm_mode, turn_A_on ; if Alarm_mode is zero (off) we want to turn it on
+		cpl Alarm_mode ; else, we turn off Alarm_mode
 		Set_Cursor(2, 14)
 		Send_Constant_String(#Alarm_Off) ; write 'off' in the alarm field
+		jb Alarm_active, turn_off_alarm ; if the alarm is actively sounding, we want to turn it off once we turn off Alarm_mode
 		sjmp check_hours_push ; jump back to the next stage in our button daisy chain
 	turn_A_on:
-		cpl Alarm_mode ; set ALARM_ON to 1
+		cpl Alarm_mode ; set Alarm_mode to 1
 		Set_Cursor(2, 14)
 		Send_Constant_String(#Alarm_On) ; write 'on' in the alarm field
 		sjmp check_hours_push ; jump back to the next stage in our button daisy chain
+turn_off_alarm: ; sub-routine that turns off the active alarm by complementing the ET0 (timer 0 interrupt)
+	clr ET0 ; turn off timer_0 interrupt, which will stop the noise
+	clr Alarm_active ; turn off the active alarm flag
+	sjmp check_hours_push ; resume button checking
 loop: ; After initialization the program stays in this 'forever' loop
 	jb SECONDS_BUTTON, check_hours_push  ; if the 'BOOT' button is not pressed goto loop_a
 	Wait_Milli_Seconds(#50)	; Debounce delay.  This macro is also in 'LCD_4bit.inc'
