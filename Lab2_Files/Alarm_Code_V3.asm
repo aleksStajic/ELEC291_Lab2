@@ -433,12 +433,5 @@ write_times: ; label to write all relevant time values to the LCD
 	Set_Cursor(2, 10)
 	Display_BCD(minutes_A)
 	ret
-    
 END
 
-;TOMORROW
-; when ALARM_CLOCK_flag is active, we can re-use a pushbutton to configure the alarm on/off
-; if the alarm is on, we need to have a flag for this
-; once the alarm is on, we need to constantly compare the alarm time with the current time
-; make sure to trigger a jump to a label if alarm sounds
-;   this label must sound the speaker, and also jump back to "loop" once the alarm is deactivated
