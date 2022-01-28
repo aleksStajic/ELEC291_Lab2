@@ -216,8 +216,7 @@ Update_Times: ;update all times subroutine (will trigger if we have reached a 60
 	lcall Update_Hours ; update hours call
 	mov a, hours
 	cjne a, #0x13, Timer2_ISR_done ; check if hours was at 12:00 when we reached 60 minutes(if not, goto Timer2_ISR_done)
-	mov hours, #0x01 ; reset hours back to 1:00 if it was at 12:00 when we reached 60 minutes
-	lcall change_AMPM ; if hours has gone over 12:00, we need to change the AMPM flag
+	mov hours, #0x01 ; else, reset hours back to 1:00 if it was at 12:00 when we reached 60 minutes
 	
 Timer2_ISR_done:
 	; after all our relevant times have updated, we should compare the current time with the alarm time if the alarm is active
@@ -273,13 +272,15 @@ Update_Minutes:	; updates either clock or alarm minute value
 		ret
 Update_Hours: ; updates either clock or alarm hour value
 	jnb Alarm_Clock_flag, Hours_Clock ; if not in alarm mode, update the clock hour values
-	mov a, hours_A
-	add a, #0x01
+	mov a, hours_A ; else, we should change the alarm values
+	add a, #0x01 ; increment alarm hour value
 	da a ;value in a -> BCD
 	mov hours_A, a ; seconds = BCD value
-	cjne a, #0x13, hours_A_done
+	cjne a, #0x12, hours_A_done0 ; if we roll over from 11 to 12, we need to change AM/PM
+	lcall change_AMPM
+	hours_A_done0:
+	cjne a, #0x13, hours_A_done ; else, we check if we should roll over from 12:00 to 1:00
 	mov hours_A, #0x01
-	lcall change_AMPM ; if we have gone over 12 hours, we need to change AM/PM
 	
 	hours_A_done:
 		ret
@@ -288,6 +289,9 @@ Update_Hours: ; updates either clock or alarm hour value
 		add a, #0x01 ; increment hours by 1
 		da a
 		mov hours, a
+		cjne a, #0x12, done_hours ; if hours is not equal to 12, we can go to done
+		lcall change_AMPM ; else, we should change AMPM
+		done_hours:
 		ret
 	
 ;---------------------------------;
@@ -374,7 +378,6 @@ hour_push:
 	mov a, hours
 	cjne a, #0x13, loop_b
 	mov hours, #0x01
-	lcall change_AMPM
 	sjmp loop_b
 loop_a: ; maximum distance from loop label for jnb to work
 	jnb one_second_flag, loop
